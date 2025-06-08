@@ -13,23 +13,23 @@ contract Auction {
         uint256 bidTime;
     }
 
-    Bid[] private offers; // Historial de todas las ofertas realizadas
-    Bid private winner; // La oferta ganadora final
-    mapping(address => Bid[]) private bidsByBider; // Historial de ofertas por cada postor
+    Bid[] private offers; // History of all bids placed
+    Bid private winner; // The final winning bid
+    mapping(address => Bid[]) private bidsByBider; // Bid history for each bidder
     mapping(address => uint256) private pendingWithdrawals;
 
     constructor () {
         owner = msg.sender;
         startTime = block.timestamp;
-        stopTime = startTime + 7 days; // Subasta de 7 días inicialmente
+        stopTime = startTime + 7 days; // 7-day auction initially
     }
 
-    // --- Eventos ---
+    // --- Events ---
     event NewOffer(address indexed bider, uint256 amount, uint256 bidTime);
     event AuctionEnded(address indexed winnerAddress, uint256 winnerValue);
     event FundsWithdrawn(address indexed bider, uint256 amount);
 
-    // --- Modificadores ---
+    // --- Modifiers ---
     modifier onlyOwner() {
         require(owner == msg.sender, "Solo el propietario puede ejecutar esto.");
         _;
@@ -45,7 +45,7 @@ contract Auction {
         _;
     }
 
-    // Valida la oferta según si es la primera o subsiguiente
+    // Validates the bid based on whether it is the first or subsequent bid
     modifier isValidBid() {
         if (offers.length == 0) {
             require(msg.value >= 1 ether, "La oferta inicial minima es 1 Ether.");
@@ -55,7 +55,7 @@ contract Auction {
         _;
     }
 
-    // --- Funciones Internas/Vista (Helpers) ---
+    // --- Internal/View Functions (Helpers) ---
 
     function isActive() internal view returns (bool) {
         return block.timestamp < stopTime && !auctionEnded;
@@ -87,15 +87,15 @@ contract Auction {
 
     }
 
-    // --- Funciones Principales ---
+    // --- Main Functions ---
 
-    // Función para hacer una oferta
+    // Function to place a bid
     function addOffer() external payable isActiveCheck isValidBid {
-        // La oferta actual se convierte en la nueva oferta más alta (por ahora)
-        // Guardar la oferta anterior para posible reembolso
+        // The current bid becomes the new highest bid (for now)
+        // Save the previous bid for possible refund
         if (winner.bider != address(0)) { // Si ya hay una oferta "ganadora"
-            // Agrega a los fondos pendientes de retirar al postor anterior
-            // Esto asume que winner siempre es la oferta a batir.
+            // Adds to pending funds for withdrawal for the previous bidder
+            // This assumes that winner is always the bid to beat.
             pendingWithdrawals[winner.bider] += winner.value;
         }
 
@@ -105,38 +105,37 @@ contract Auction {
             bidTime: block.timestamp
         });
 
-        offers.push(newBid); // Añadir al historial global de ofertas
-        bidsByBider[msg.sender].push(newBid); // Añadir al historial de ofertas por postor
+        offers.push(newBid); // Add to global bid history
+        bidsByBider[msg.sender].push(newBid); // Add to bidder's bid history
 
-        winner = newBid; // Actualizar el 'ganador' provisional
-        stopTime += 10 minutes; // Extiende la subasta por 10 minutos
+        winner = newBid; // Update the provisional 'winner'
+        stopTime += 10 minutes; // Extends the auction by 10 minutes
         
         emit NewOffer(msg.sender, msg.value, block.timestamp);
     }
 
-    // Función para finalizar la subasta y determinar el ganador
+    // Function to end the auction and determine the winner
     function endAuction() external onlyOwner isNotActiveCheck {
-        require(!auctionEnded, "La subasta ya ha finalizado."); // Evitar llamar múltiples veces
+        require(!auctionEnded, "La subasta ya ha finalizado."); // Prevent calling multiple times
 
-        auctionEnded = true; // Marcar la subasta como terminada permanentemente
+        auctionEnded = true; // Mark the auction as permanently ended
 
-        // Lógica para el ganador (si no hubo ofertas, winner.bider será address(0))
+        // Logic for the winner (if no bids, winner.bider will be address(0))
         if (offers.length > 0) {
-            // Si hay un ganador (es decir, hubo al menos una oferta válida)
+            // If there's a winner (i.e., there was at least one valid bid)
             if (winner.bider != address(0)) {
-                // El valor del ganador se queda en el contrato.
-                // El resto del Ether de los perdedores es reembolsado.
+                // The winner's value remains in the contract.
+                // The rest of the Ether from the losers is refunded.
                 for (uint i = 0; i < offers.length; i++) { 
                     withdrawFundsForInternalUseOnly(true, offers[i].bider);
                 }
             }
         }
-
         emit AuctionEnded(winner.bider, winner.value);
     }
 
 
-    // Permite a los participantes retirar los fondos de sus ofertas anteriores
+    // Allows participants to withdraw funds from their previous bids
     function withdrawFunds() external {
         withdrawFundsForInternalUseOnly(false, msg.sender);
     }
@@ -144,67 +143,65 @@ contract Auction {
 
     // --- Getters ---
 
-    // Devolver la oferta ganadora y sus detalles
+    // Return the winning bid and its details
     function showWinner() external view returns(Bid memory) {
         require(auctionEnded && winner.bider != address(0), "El ganador aun no ha sido determinado o la subasta no ha terminado.");
         return winner;
     }
 
-    // Devolver todas las ofertas realizadas
+    // Return all bids placed
     function showAllOffers() external view returns (Bid[] memory) {
         return offers;
     }
 
-    // Devolver ofertas de un postor específico
+    // Return bids by a specific bidder
     function showBidsByBider(address _bider) external view returns (Bid[] memory) {
         return bidsByBider[_bider];
     }
 
-    // Obtener el propietario
+    // Get the owner
     function getOwner() external view returns (address) {
         return owner;
     }
 
-    // Obtener el tiempo de finalización
+    // Get the stop time
     function getStopTime() external view returns (uint256) {
         return stopTime;
     }
 
-    // Obtener fondos pendientes de un usuario
+    // Get pending funds for a user
     function getPendingWithdrawal(address _bider) external view returns (uint256) {
         return pendingWithdrawals[_bider];
     }
 
 
-    // Funcion para retirar todo el Ether del contrato
+    // Function to withdraw all Ether from the contract
     function withdrawContractBalanceToOwner() external onlyOwner isNotActiveCheck{
-        // Balance total del contrato
+        // Total contract balance
         uint256 contractBalance = address(this).balance;
 
-        // Asegurarse de que haya Ether para enviar
+        // Ensure there's Ether to send
         require(contractBalance > 0, "No hay Ether en el contrato para retirar.");
 
-        // Realiza la transferencia al propietario
+        // Perform the transfer to the owner
         (bool success, ) = payable(owner).call{value: contractBalance}("");
         require(success, "Fallo al enviar el balance del contrato al propietario.");
 
         emit FundsWithdrawn(owner, contractBalance); 
     }
 
-    // Parada de emergencia
+    // Emergency stop
     function emergencyStop() external onlyOwner isActiveCheck {
         stopTime = block.timestamp;
     }
 
-    // Función para recibir Ether directamente sin llamar a una función específica
+    // Function to receive Ether directly without calling a specific function
     receive() external payable {
-        // Esto es útil si alguien accidentalmente envía Ether al contrato sin llamar a addOffer
-        // o si un contrato envía Ether sin especificar una función.
-        // Mas ethercito para papa jajaja
+        // This is useful if someone accidentally sends Ether to the contract without calling addOffer
+        // or if a contract sends Ether without specifying a function.
     }
 
-    // Función de fallback para llamadas a funciones no existentes o sin data
+    //  Fallback function for calls to non-existent functions or calls without data
     fallback() external payable {
-        // Venga ethercito acumulemos dinerito jajaja
     }
 }
