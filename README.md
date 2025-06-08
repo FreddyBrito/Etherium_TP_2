@@ -10,10 +10,12 @@ El Smart Contract de Subasta cumple con los siguientes requisitos generales:
 * **Verificado:** El código fuente del contrato ha sido verificado y es accesible públicamente.
 
 **URL del Contrato Publicado y Verificado:**
-[Insertar URL del contrato verificado en Sepolia aquí]
+0x7787aB831287AE254491EE4CfF89802E6828899a
+[https://sepolia.etherscan.io/address/0x7787aB831287AE254491EE4CfF89802E6828899a#code]
+
 
 **Repositorio Público en GitHub:**
-[Insertar URL del repositorio público en GitHub aquí]
+[https://github.com/FreddyBrito/Etherium_TP_2/blob/main/auction.sol]
 
 ## ⚙️ Funcionalidades Requeridas
 
